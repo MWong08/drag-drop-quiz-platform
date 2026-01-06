@@ -1,22 +1,22 @@
 from flask import Flask, render_template, request, jsonify, send_file
 from flask_socketio import SocketIO, emit, join_room
+from flask_cors import CORS
 from models import db, Admin, Quiz, QuizItem, GameSession, Participant, ParticipantAnswer
 from werkzeug.security import generate_password_hash, check_password_hash
-import random
-import string
-from datetime import datetime, timezone
-import os
+from werkzeug.utils import secure_filename
+from google.cloud import storage
 from dotenv import load_dotenv
+import os
 import csv
 import zipfile
 import shutil
 from io import BytesIO, StringIO
 from pathlib import Path
-from werkzeug.utils import secure_filename
+from datetime import datetime, timezone
+import random
+import string
 
-load_dotenv()
-
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='', template_folder='templates')
 
 # Configuration
 DATABASE_URL = os.environ.get('DATABASE_URL')
@@ -31,14 +31,62 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 # Initialize extensions
 db.init_app(app)
+CORS(app, resources={r"/api/*": {"origins": "*"}})  # Configure CORS for API routes
+
+# Socket.IO configuration
+# async_mode is auto-detected based on installed packages (eventlet is in requirements.txt)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Create database tables and upload folder
-with app.app_context():
-    db.create_all()
-    print("Database tables created!")
+# Create database tables and upload folder (only once)
+def init_db():
+    with app.app_context():
+        db.create_all()
+        print("Database tables created!")
 
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# GCS configuration
+GCS_BUCKET_NAME = 'drag-drop-quiz-uploads'
+gcs_client = None
+
+def get_gcs_client():
+    global gcs_client
+    if gcs_client is None:
+        try:
+            gcs_client = storage.Client()
+        except Exception as e:
+            print(f"Warning: Could not initialize GCS client: {e}")
+            return None
+    return gcs_client
+
+def upload_file_to_gcs(file_content, filename):
+    """Upload file to Google Cloud Storage and return public URL"""
+    try:
+        client = get_gcs_client()
+        if client is None:
+            # Fallback to local storage if GCS unavailable
+            return upload_file_locally(file_content, filename)
+        
+        bucket = client.bucket(GCS_BUCKET_NAME)
+        blob = bucket.blob(filename)
+        blob.upload_from_string(file_content, content_type='image/webp')
+        # Make blob publicly readable
+        blob.make_public()
+        return blob.public_url
+    except Exception as e:
+        print(f"GCS upload error: {e}. Falling back to local storage.")
+        return upload_file_locally(file_content, filename)
+
+def upload_file_locally(file_content, filename):
+    """Fallback: Upload file to local filesystem"""
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    with open(filepath, 'wb') as f:
+        if isinstance(file_content, bytes):
+            f.write(file_content)
+        else:
+            f.write(file_content.read())
+    return f"/static/uploads/{filename}"
 
 # Helper function to generate game code
 def generate_game_code():
@@ -182,19 +230,15 @@ def import_quiz_from_zip(zip_file, admin_id):
                     name, ext = os.path.splitext(image_file)
                     unique_filename = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{name}{ext}"
                     
-                    # Ensure directory exists
-                    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-                    
-                    # Save file
-                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-                    with open(filepath, 'wb') as img_dest:
-                        img_dest.write(img_source.read())
+                    # Upload to GCS or local storage
+                    image_content = img_source.read()
+                    image_url = upload_file_to_gcs(image_content, unique_filename)
                 
                 # Create quiz item
                 quiz_item = QuizItem(
                     quiz_id=quiz.quiz_id,
                     text=item_data.get('text', '') or '',
-                    image_url=f"/static/uploads/{unique_filename}",
+                    image_url=image_url,
                     original_filename=image_file,
                     correct_position=int(item_data.get('correct_position', 1)),
                     item_order=int(item_data.get('item_order', 1))
@@ -317,15 +361,15 @@ def add_quiz_item(quiz_id):
     if file.filename == '':
         return jsonify({'error': 'No image selected'}), 400
     
-    # Save file
-    filename = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{file.filename}"
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(filepath)
+    # Save file to GCS or local storage
+    filename = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{secure_filename(file.filename)}"
+    image_content = file.read()
+    image_url = upload_file_to_gcs(image_content, filename)
     
     new_item = QuizItem(
         quiz_id=quiz_id,
         text=data.get('text', ''),
-        image_url=f"/static/uploads/{filename}",
+        image_url=image_url,
         correct_position=int(data.get('correct_position')),
         item_order=int(data.get('item_order', 1))
     )
@@ -424,10 +468,10 @@ def update_quiz_item(item_id):
     if 'image' in request.files:
         file = request.files['image']
         if file and file.filename != '':
-            filename = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{file.filename}"
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            item.image_url = f"/static/uploads/{filename}"
+            filename = f"{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{secure_filename(file.filename)}"
+            image_content = file.read()
+            image_url = upload_file_to_gcs(image_content, filename)
+            item.image_url = image_url
     
     db.session.commit()
     
@@ -674,5 +718,9 @@ def handle_end_game(data):
         emit('game_ended', {}, room=f'game_{game_code}')
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    socketio.run(app, host='0.0.0.0', port=port, debug=True)
+    # Initialize database only once
+    init_db()
+    
+    port = int(os.environ.get('PORT', 8080))
+    debug = os.environ.get('FLASK_ENV') != 'production'
+    socketio.run(app, host='0.0.0.0', port=port, debug=debug)

@@ -21,3 +21,7 @@ htmlcov/
 dist/
 build/
 *.egg-info/
+.firebase/
+.firebaserc
+firebase.json
+static/firebaseConfig.js

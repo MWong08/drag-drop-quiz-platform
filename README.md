@@ -123,6 +123,32 @@ The application uses SQLite by default. Database schema includes:
     └── uploads/          # User-uploaded images
 ```
 
+## Important Files for Cloning & Running
+
+When you clone this repository, these files are essential:
+
+| File | Purpose |
+|------|---------|
+| **app.py** | Main Flask application with all routes, Socket.IO events, and business logic |
+| **models.py** | SQLAlchemy database models (Admin, Quiz, QuizItem, GameSession, Participant, ParticipantAnswer) |
+| **requirements.txt** | Python package dependencies - install with `pip install -r requirements.txt` |
+| **templates/** | Jinja2 HTML templates for all pages (login, dashboard, game, etc.) |
+| **static/index.html** | Home landing page |
+| **Dockerfile** | Container configuration for Docker deployment |
+| **cloudbuild.yaml** | Google Cloud Build pipeline configuration |
+| **firebase.json** | Firebase hosting configuration |
+| **setup-deployment.sh** | Bash script for deployment setup (Linux/Mac) |
+| **setup-deployment.bat** | Batch script for deployment setup (Windows) |
+| **GCS_SETUP.md** | Guide for setting up Google Cloud Storage integration |
+| **GCS_INTEGRATION.md** | Documentation for GCS image upload features |
+| **DEPLOYMENT_GUIDE.md** | Complete deployment instructions for various platforms |
+
+**Note:** The following files are ignored by git (see `.gitignore`) as they contain sensitive credentials:
+- `.firebase/` - Local Firebase configuration
+- `.firebaserc` - Firebase project ID
+- `firebase.json` - Firebase config (if not already tracked)
+- `static/firebaseConfig.js` - Firebase API keys (you'll need to create this from your Firebase project)
+
 ## Tips for Creating Great Quizzes
 
 1. **Use Clear Images**: Make sure images are easy to distinguish
