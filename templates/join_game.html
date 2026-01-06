@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join Game - Drag & Drop Quiz</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .container {
+            text-align: center;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            max-width: 500px;
+            width: 90%;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        input {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2em;
+            border: none;
+            border-radius: 10px;
+            text-align: center;
+            text-transform: uppercase;
+            font-weight: bold;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            font-size: 1.2em;
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:disabled {
+            background: #999;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .message {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .message.error {
+            background: rgba(244, 67, 54, 0.8);
+        }
+
+        .message.success {
+            background: rgba(76, 175, 80, 0.8);
+        }
+
+        .back-link {
+            margin-top: 30px;
+        }
+
+        .back-link a {
+            color: white;
+            text-decoration: none;
+            opacity: 0.8;
+        }
+
+        .back-link a:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Join Game</h1>
+        
+        <div class="form-group">
+            <label for="game-code">Game Code</label>
+            <input type="text" id="game-code" placeholder="ABCD12" maxlength="6">
+        </div>
+
+        <div class="form-group">
+            <label for="nickname">Your Nickname</label>
+            <input type="text" id="nickname" placeholder="Enter your name" maxlength="20">
+        </div>
+
+        <button class="btn" id="join-btn" onclick="joinGame()">Join Game</button>
+
+        <div id="message" class="message"></div>
+
+        <div class="back-link">
+            <a href="/">← Back to Home</a>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+
+        async function joinGame() {
+            const gameCode = document.getElementById('game-code').value.trim().toUpperCase();
+            const nickname = document.getElementById('nickname').value.trim();
+            const messageDiv = document.getElementById('message');
+            const joinBtn = document.getElementById('join-btn');
+
+            if (!gameCode || !nickname) {
+                messageDiv.textContent = 'Please enter both game code and nickname';
+                messageDiv.className = 'message error';
+                messageDiv.style.display = 'block';
+                return;
+            }
+
+            joinBtn.disabled = true;
+            joinBtn.textContent = 'Joining...';
+
+            try {
+                const response = await fetch('/api/game/join', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        game_code: gameCode,
+                        nickname: nickname
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    localStorage.setItem('participant_id', data.participant_id);
+                    localStorage.setItem('nickname', nickname);
+
+                    messageDiv.textContent = 'Joined successfully! Redirecting...';
+                    messageDiv.className = 'message success';
+                    messageDiv.style.display = 'block';
+
+                    setTimeout(() => {
+                        window.location.href = `/game/play/${gameCode}`;
+                    }, 1000);
+                } else {
+                    messageDiv.textContent = data.error || 'Failed to join game';
+                    messageDiv.className = 'message error';
+                    messageDiv.style.display = 'block';
+                    joinBtn.disabled = false;
+                    joinBtn.textContent = 'Join Game';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                messageDiv.textContent = 'Error joining game. Please try again.';
+                messageDiv.className = 'message error';
+                messageDiv.style.display = 'block';
+                joinBtn.disabled = false;
+                joinBtn.textContent = 'Join Game';
+            }
+        }
+
+        document.getElementById('game-code').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('nickname').focus();
+            }
+        });
+
+        document.getElementById('nickname').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                joinGame();
+            }
+        });
+    </script>
+</body>
+</html>

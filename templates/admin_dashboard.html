@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Drag & Drop Quiz</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+        }
+
+        .navbar {
+            background: #667eea;
+            color: white;
+            padding: 20px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .navbar h1 {
+            font-size: 1.5em;
+        }
+
+        .navbar .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .btn-logout {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .btn-logout:hover {
+            background: rgba(255,255,255,0.35);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+
+        .welcome {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .welcome h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .action-card {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .action-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 8px 24px rgba(102, 126, 234, 0.25);
+        }
+
+        .action-card .icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+
+        .action-card h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .action-card p {
+            color: #666;
+        }
+
+        .quizzes-section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .quizzes-section h2 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        .quiz-item {
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .quiz-item:hover {
+            border-color: #667eea;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+        }
+
+        .quiz-info h3 {
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .quiz-info p {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .quiz-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-start {
+            background: #4caf50;
+            color: white;
+        }
+
+        .btn-start:hover {
+            background: #45a049;
+        }
+
+        .btn-edit {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-edit:hover {
+            background: #0b7dda;
+        }
+
+        .btn-delete {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-delete:hover {
+            background: #da190b;
+        }
+
+        .btn-export {
+            background: #ff9800;
+            color: white;
+        }
+
+        .btn-export:hover {
+            background: #e68900;
+        }
+
+        .btn-import {
+            background: #9c27b0;
+            color: white;
+        }
+
+        .btn-import:hover {
+            background: #7b1fa2;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        .empty-state .icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+        }
+
+        .hidden-file-input {
+            display: none;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 400px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .modal-header {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .modal-body {
+            margin-bottom: 20px;
+        }
+
+        .modal-body input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            box-sizing: border-box;
+        }
+
+        .modal-footer {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .modal-footer button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .btn-modal-import {
+            background: #9c27b0;
+            color: white;
+        }
+
+        .btn-modal-import:hover {
+            background: #7b1fa2;
+        }
+
+        .btn-modal-cancel {
+            background: #ddd;
+            color: #333;
+        }
+
+        .btn-modal-cancel:hover {
+            background: #ccc;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>🧩 Drag & Drop Quiz Admin</h1>
+        <div class="user-info">
+            <span id="username-display">Admin</span>
+            <button class="btn-logout" onclick="logout()">Logout</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="welcome">
+            <h2>Welcome back! 👋</h2>
+            <p>Manage your drag & drop quizzes and start new game sessions</p>
+        </div>
+
+        <div class="actions">
+            <a href="/admin/create-quiz" class="action-card">
+                <div class="icon">📝</div>
+                <h3>Create Quiz</h3>
+                <p>Build a new drag & drop quiz</p>
+            </a>
+            <button onclick="openImportModal()" class="action-card" style="background: none; cursor: pointer; border: 2px solid #9c27b0;">
+                <div class="icon">📥</div>
+                <h3>Import Quiz</h3>
+                <p>Import a quiz from ZIP file</p>
+            </button>
+        </div>
+
+        <div class="quizzes-section">
+            <h2>Your Quizzes</h2>
+            <div id="quiz-list">
+                <div class="empty-state">
+                    <div class="icon">📚</div>
+                    <p>No quizzes yet. Create your first quiz to get started!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const adminId = localStorage.getItem('admin_id');
+        const username = localStorage.getItem('username');
+
+        if (!adminId) {
+            window.location.href = '/admin/login';
+        }
+
+        document.getElementById('username-display').textContent = username || 'Admin';
+
+        function logout() {
+            localStorage.removeItem('admin_id');
+            localStorage.removeItem('username');
+            window.location.href = '/admin/login';
+        }
+
+        async function loadQuizzes() {
+            try {
+                const response = await fetch(`/api/admin/${adminId}/quizzes`);
+                const quizzes = await response.json();
+
+                const quizListDiv = document.getElementById('quiz-list');
+
+                if (quizzes.length === 0) {
+                    quizListDiv.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">📚</div>
+                            <p>No quizzes yet. Create your first quiz to get started!</p>
+                        </div>
+                    `;
+                } else {
+                    quizListDiv.innerHTML = quizzes.map(quiz => `
+                        <div class="quiz-item">
+                            <div class="quiz-info">
+                                <h3>${quiz.title}</h3>
+                                <p>${quiz.description || 'No description'} • ${quiz.item_count} items • ${quiz.num_positions} positions</p>
+                                <p style="font-size: 0.85em; margin-top: 5px;">Created: ${quiz.created_at}</p>
+                            </div>
+                            <div class="quiz-actions">
+                                <button class="btn btn-start" onclick="startGame(${quiz.quiz_id})">▶️ Start Game</button>
+                                <button class="btn btn-edit" onclick="editQuiz(${quiz.quiz_id})">✏️ Edit</button>
+                                <button class="btn btn-export" onclick="exportQuiz(${quiz.quiz_id})">📤 Export</button>
+                                <button class="btn btn-delete" onclick="deleteQuiz(${quiz.quiz_id})">🗑️ Delete</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading quizzes:', error);
+            }
+        }
+
+        async function startGame(quizId) {
+            try {
+                const response = await fetch('/api/game/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        quiz_id: quizId,
+                        admin_id: adminId
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    window.location.href = `/admin/host/${data.game_code}`;
+                } else {
+                    alert('Failed to start game');
+                }
+            } catch (error) {
+                alert('Error starting game');
+            }
+        }
+
+        function editQuiz(quizId) {
+            window.location.href = `/admin/create-quiz?quiz_id=${quizId}`;
+        }
+
+        async function deleteQuiz(quizId) {
+            if (confirm('Are you sure you want to delete this quiz?')) {
+                try {
+                    const response = await fetch(`/api/quiz/${quizId}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (response.ok) {
+                        alert('Quiz deleted successfully!');
+                        loadQuizzes();
+                    } else {
+                        alert('Failed to delete quiz');
+                    }
+                } catch (error) {
+                    console.error('Error deleting quiz:', error);
+                    alert('Error deleting quiz');
+                }
+            }
+        }
+
+        loadQuizzes();
+    </script>
+
+    <div id="import-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">📥 Import Quiz</div>
+            <div class="modal-body">
+                <input type="file" id="import-file" accept=".zip" />
+                <p style="font-size: 0.85em; color: #666; margin-top: 10px;">Select a ZIP file containing quiz.csv and images folder</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-modal-cancel" onclick="closeImportModal()">Cancel</button>
+                <button class="btn-modal-import" onclick="importQuiz()">Import</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const importModal = document.getElementById('import-modal');
+
+        function openImportModal() {
+            importModal.style.display = 'block';
+            document.getElementById('import-file').value = '';
+        }
+
+        function closeImportModal() {
+            importModal.style.display = 'none';
+        }
+
+        window.onclick = function(event) {
+            if (event.target === importModal) {
+                closeImportModal();
+            }
+        }
+
+        async function exportQuiz(quizId) {
+            try {
+                const response = await fetch(`/api/quiz/${quizId}/export?admin_id=${adminId}`);
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    
+                    // Get filename from Content-Disposition header or use default
+                    const contentDisposition = response.headers.get('content-disposition');
+                    let filename = 'quiz_export.zip';
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename="([^"]+)"/);
+                        if (match) filename = match[1];
+                    }
+                    
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    alert('Failed to export quiz');
+                }
+            } catch (error) {
+                console.error('Error exporting quiz:', error);
+                alert('Error exporting quiz');
+            }
+        }
+
+        async function importQuiz() {
+            const fileInput = document.getElementById('import-file');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('Please select a ZIP file');
+                return;
+            }
+
+            if (!file.name.endsWith('.zip')) {
+                alert('Please select a ZIP file');
+                return;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('admin_id', adminId);
+                formData.append('file', file);
+
+                const response = await fetch('/api/quiz/import', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('Quiz imported successfully!');
+                    closeImportModal();
+                    loadQuizzes();
+                } else {
+                    alert(`Import failed: ${data.error}`);
+                }
+            } catch (error) {
+                console.error('Error importing quiz:', error);
+                alert('Error importing quiz');
+            }
+        }
+    </script>
+</body>
+</html>
