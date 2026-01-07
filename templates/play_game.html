@@ -225,6 +225,13 @@
             transform: scale(1.05);
         }
 
+        .drop-zone.click-mode-hover {
+            background: rgba(100, 200, 255, 0.5);
+            border-color: #64c8ff;
+            transform: scale(1.05);
+            cursor: pointer;
+        }
+
         .drop-zone-number {
             font-size: 3em;
             font-weight: bold;
@@ -314,6 +321,12 @@
         .draggable-item.placed {
             opacity: 0.3;
             cursor: not-allowed;
+        }
+
+        .draggable-item.selected {
+            border: 4px solid #4caf50;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.8), 0 4px 8px rgba(0, 0, 0, 0.2);
+            transform: scale(1.05);
         }
 
         .item-image {
@@ -453,6 +466,13 @@
                     🧩 Drag the pictures into the correct numbered positions!
                 </div>
 
+                <div style="text-align: center; margin-bottom: 15px;">
+                    <label style="display: inline-flex; align-items: center; gap: 10px; cursor: pointer; background: rgba(255,255,255,0.2); padding: 10px 15px; border-radius: 8px;">
+                        <input type="checkbox" id="click-mode-toggle" style="width: 20px; height: 20px; cursor: pointer;">
+                        <span style="font-size: 1em;">📱 Use Click Mode (Mobile Friendly)</span>
+                    </label>
+                </div>
+
                 <!-- Drop Zones -->
                 <div id="drop-zones" class="drop-zones">
                     <!-- Drop zones will be generated dynamically -->
@@ -503,8 +523,21 @@
 
         let quizData = null;
         let answers = {};
+        let clickMode = false;
+        let selectedItemId = null;
 
         document.getElementById('player-name').textContent = nickname || 'Player';
+
+        // Click mode toggle
+        document.getElementById('click-mode-toggle').addEventListener('change', function(e) {
+            clickMode = e.target.checked;
+            selectedItemId = null;
+            if (clickMode) {
+                document.querySelectorAll('.draggable-item').forEach(item => {
+                    item.classList.remove('selected');
+                });
+            }
+        });
 
         // Join the game socket room
         socket.emit('join_game', {
@@ -570,6 +603,7 @@
                 dropZone.addEventListener('dragover', handleDragOver);
                 dropZone.addEventListener('drop', handleDrop);
                 dropZone.addEventListener('dragleave', handleDragLeave);
+                dropZone.addEventListener('click', handleDropZoneClick);
                 
                 dropZonesContainer.appendChild(dropZone);
             }
@@ -597,6 +631,7 @@
                 
                 draggableItem.addEventListener('dragstart', handleDragStart);
                 draggableItem.addEventListener('dragend', handleDragEnd);
+                draggableItem.addEventListener('click', handleItemClick);
                 
                 itemsContainer.appendChild(draggableItem);
             });
@@ -635,6 +670,108 @@
         }
 
         let draggedElement = null;
+
+        function handleItemClick(e) {
+            if (!clickMode) return;
+            
+            e.stopPropagation();
+            
+            const itemId = this.dataset.itemId;
+            
+            // If item is already placed, don't allow selection
+            if (this.classList.contains('placed')) {
+                return;
+            }
+            
+            // Deselect if clicking the same item
+            if (selectedItemId === itemId) {
+                this.classList.remove('selected');
+                selectedItemId = null;
+                return;
+            }
+            
+            // Deselect previous item
+            if (selectedItemId) {
+                const prevItem = document.querySelector(`[data-item-id="${selectedItemId}"]`);
+                if (prevItem) {
+                    prevItem.classList.remove('selected');
+                }
+            }
+            
+            // Select new item
+            this.classList.add('selected');
+            selectedItemId = itemId;
+        }
+
+        function handleDropZoneClick(e) {
+            if (!clickMode || !selectedItemId) return;
+            
+            e.stopPropagation();
+            
+            const position = parseInt(this.dataset.position);
+            const itemId = selectedItemId;
+            
+            // Find the dragged element
+            draggedElement = document.querySelector(`[data-item-id="${itemId}"]`);
+            
+            if (!draggedElement) return;
+            
+            // If this item is already placed elsewhere, remove it from that position first
+            if (answers[itemId]) {
+                const oldPosition = answers[itemId];
+                const oldDropZone = document.querySelector(`[data-position="${oldPosition}"]`);
+                if (oldDropZone) {
+                    const oldDroppedItem = oldDropZone.querySelector('.dropped-item');
+                    if (oldDroppedItem && oldDroppedItem.dataset.itemId === itemId) {
+                        oldDroppedItem.remove();
+                    }
+                }
+            }
+            
+            // Remove any existing item in this drop zone and return it to draggable items
+            const existingDroppedItem = this.querySelector('.dropped-item');
+            if (existingDroppedItem) {
+                const existingItemId = existingDroppedItem.dataset.itemId;
+                
+                // Find the original item in draggable-items
+                const originalItem = document.querySelector(`#draggable-items [data-item-id="${existingItemId}"]`);
+                if (originalItem) {
+                    originalItem.style.display = '';
+                    originalItem.classList.remove('placed');
+                    originalItem.draggable = true;
+                }
+                
+                // Remove the dropped item from dropzone
+                existingDroppedItem.remove();
+                
+                // Remove from answers
+                delete answers[existingItemId];
+            }
+            
+            // Move the dragged item to the drop zone
+            draggedElement.classList.add('placed');
+            draggedElement.classList.remove('selected');
+            draggedElement.style.display = 'none';
+            
+            // Create a proper dropped item element
+            const droppedItem = document.createElement('div');
+            droppedItem.className = 'draggable-item dropped-item';
+            droppedItem.dataset.itemId = itemId;
+            droppedItem.innerHTML = `
+                <img src="${draggedElement.querySelector('.item-image').src}" class="item-image" alt="Item">
+            `;
+            
+            this.appendChild(droppedItem);
+            
+            // Record answer
+            answers[itemId] = position;
+            
+            // Reset selection
+            selectedItemId = null;
+            
+            // Check if all items are placed
+            checkAllPlaced();
+        }
 
         function handleDragStart(e) {
             draggedElement = this;
@@ -743,6 +880,7 @@
             if (originalItem) {
                 originalItem.style.display = '';
                 originalItem.classList.remove('placed');
+                originalItem.classList.remove('selected');
                 originalItem.draggable = true;
             } else {
                 // If not found, recreate it from quiz data
@@ -758,6 +896,7 @@
                     
                     recreatedItem.addEventListener('dragstart', handleDragStart);
                     recreatedItem.addEventListener('dragend', handleDragEnd);
+                    recreatedItem.addEventListener('click', handleItemClick);
                     
                     document.getElementById('draggable-items').appendChild(recreatedItem);
                 }
@@ -768,6 +907,11 @@
             
             // Remove from answers
             delete answers[itemId];
+            
+            // Reset selection if this was the selected item
+            if (selectedItemId === itemId) {
+                selectedItemId = null;
+            }
             
             // Update button states
             checkAllPlaced();
@@ -803,6 +947,7 @@
                 if (originalItem) {
                     originalItem.style.display = '';
                     originalItem.classList.remove('placed');
+                    originalItem.classList.remove('selected');
                     originalItem.draggable = true;
                 } else {
                     // Recreate from quiz data if not found
@@ -818,6 +963,7 @@
                         
                         recreatedItem.addEventListener('dragstart', handleDragStart);
                         recreatedItem.addEventListener('dragend', handleDragEnd);
+                        recreatedItem.addEventListener('click', handleItemClick);
                         
                         document.getElementById('draggable-items').appendChild(recreatedItem);
                     }
@@ -829,6 +975,9 @@
             
             // Remove all dropped items from all drop zones
             droppedItems.forEach(item => item.remove());
+            
+            // Reset selection
+            selectedItemId = null;
             
             // Update button states
             checkAllPlaced();
