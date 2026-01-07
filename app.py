@@ -329,6 +329,30 @@ def login():
     
     return jsonify({'error': 'Invalid credentials'}), 401
 
+@app.route('/api/change-password', methods=['POST'])
+def change_password():
+    data = request.json
+    admin_id = data.get('admin_id')
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    
+    if not admin_id or not current_password or not new_password:
+        return jsonify({'error': 'Missing required fields'}), 400
+    
+    admin = Admin.query.filter_by(admin_id=admin_id).first()
+    if not admin:
+        return jsonify({'error': 'Admin not found'}), 404
+    
+    # Verify current password
+    if not check_password_hash(admin.password_hash, current_password):
+        return jsonify({'error': 'Current password is incorrect'}), 401
+    
+    # Update password
+    admin.password_hash = generate_password_hash(new_password)
+    db.session.commit()
+    
+    return jsonify({'message': 'Password changed successfully'}), 200
+
 @app.route('/api/quiz', methods=['POST'])
 def create_quiz():
     data = request.json
