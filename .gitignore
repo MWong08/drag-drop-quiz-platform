@@ -25,3 +25,4 @@ build/
 .firebaserc
 firebase.json
 static/firebaseConfig.js
+z.*
